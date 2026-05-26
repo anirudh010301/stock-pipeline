@@ -1,0 +1,23 @@
+# Environment variables - never push to GitHub
+.env
+
+# Mac system files - created automatically by Mac, we don't need these
+.DS_Store
+
+# Python cache files - created automatically when Python runs
+__pycache__/
+*.pyc
+*.pyo
+
+# Airflow logs - these get very large, we don't need them on GitHub
+logs/
+airflow.db
+airflow.cfg
+
+# dbt target folder - generated files, not needed on GitHub
+dbt_project/target/
+dbt_project/dbt_packages/
+
+# Virtual environment folder - if we create one
+venv/
+.venv/
