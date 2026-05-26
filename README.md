@@ -138,5 +138,3 @@ streamlit run dashboard/app.py
 ## 👤 Author
 
 **Anirudh Adda**
-
-- GitHub: [@addaanirudh](https://github.com/addaanirudh)
