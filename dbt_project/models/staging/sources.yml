@@ -1,0 +1,30 @@
+# ============================================================
+# sources.yml
+# This file tells dbt where to find our raw data in PostgreSQL
+# registering our raw table with dbt
+# ============================================================
+
+version: 2
+
+sources:
+  - name: stock_pipeline # Name we use to reference this source in SQL
+    database: stock_db # The PostgreSQL database name
+    schema: public # The schema where our raw table lives
+    tables:
+      - name: raw_stock_prices # The exact table name in PostgreSQL
+        description: "Raw stock price data ingested from yfinance"
+        columns:
+          - name: date
+            description: "The trading date"
+          - name: ticker
+            description: "The stock ticker symbol e.g. AAPL"
+          - name: open
+            description: "Opening price of the stock on that day"
+          - name: high
+            description: "Highest price of the stock on that day"
+          - name: low
+            description: "Lowest price of the stock on that day"
+          - name: close
+            description: "Closing price of the stock on that day"
+          - name: volume
+            description: "Number of shares traded on that day"

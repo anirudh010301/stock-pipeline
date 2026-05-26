@@ -1,0 +1,31 @@
+# ============================================================
+# dbt_project.yml
+# This is the main configuration file for our dbt project
+# ============================================================
+
+name: "stock_pipeline" # Name of our dbt project
+version: "1.0.0" # Version of our project
+profile: "stock_pipeline" # Name of the connection profile (defined in profiles.yml)
+
+# Tell dbt where to find our models
+model-paths: ["models"]
+
+# Tell dbt where to find our tests
+test-paths: ["tests"]
+
+# Where dbt stores compiled SQL and results
+target-path: "target"
+
+# Packages dbt installs
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+# This tells dbt how to materialize our models in PostgreSQL
+models:
+  stock_pipeline:
+    staging:
+      +materialized: view # Staging models are created as views
+    marts:
+      +materialized: table # Mart models are created as tables
