@@ -1,6 +1,10 @@
-# 📈 Stock Price Data Pipeline
+Perfect! Everything is already pushed to GitHub. ✅
+Now let's update the README. Type this and hit Enter:
+bashcode README.md
+Then replace the entire file with this final version:
+markdown# 📈 Stock Price Data Pipeline
 
-An end-to-end batch data pipeline that automatically ingests real stock market data daily, transforms it, stores it in a production-grade database, and displays it on an interactive Bloomberg-style dashboard — fully orchestrated by Apache Airflow.
+An end-to-end batch data pipeline that automatically ingests real stock market data daily, transforms it, stores it in a production-grade database, and displays it on an interactive Bloomberg-style dashboard — fully orchestrated by Apache Airflow and containerized with Docker.
 
 ---
 
@@ -8,8 +12,8 @@ An end-to-end batch data pipeline that automatically ingests real stock market d
 
 yfinance API → Python Ingestion → PostgreSQL (Raw) → dbt Transformation → PostgreSQL (Marts) → Streamlit Dashboard
 ↑
-Apache Airflow (Daily Schedule)
-Docker & Docker Compose
+Apache Airflow (Daily Schedule at Midnight)
+Docker & Docker Compose (Single Command Setup)
 
 ---
 
@@ -23,7 +27,7 @@ Docker & Docker Compose
 | Transformation   | `dbt Core`                | Cleans and transforms raw data using SQL models   |
 | Data Warehouse   | `PostgreSQL`              | Stores all data — also used as Airflow backend    |
 | Dashboard        | `Streamlit`               | Interactive Bloomberg-style visualization         |
-| Containerization | `Docker & Docker Compose` | Runs PostgreSQL in an isolated container          |
+| Containerization | `Docker & Docker Compose` | Runs entire stack with a single command           |
 | Version Control  | `Git & GitHub`            | Tracks all code changes publicly                  |
 
 ---
@@ -63,14 +67,17 @@ stock-pipeline/
 ├── ingestion/
 │ └── fetch_stocks.py # Python ingestion script
 ├── dashboard/
-│ └── app.py # Streamlit dashboard
+│ ├── app.py # Streamlit dashboard
+│ └── requirements.txt # Dashboard dependencies
 ├── dbt_project/
 │ ├── models/
 │ │ ├── staging/ # stg_stock_prices.sql
 │ │ └── marts/ # fct_stock_prices.sql
 │ └── dbt_project.yml # dbt configuration
 ├── docker/
-│ └── docker-compose.yml # PostgreSQL container config
+│ ├── docker-compose.yml # Full stack Docker config
+│ ├── Dockerfile.airflow # Custom Airflow image with dependencies
+│ └── init.sql # Creates airflow_db on startup
 ├── .env # Environment variables (not on GitHub)
 ├── requirements.txt # Python dependencies
 └── README.md # Project documentation
@@ -79,6 +86,12 @@ stock-pipeline/
 
 ## 🚀 How to Run This Project
 
+### Prerequisites
+
+- Docker Desktop installed and running
+- At least 4GB RAM allocated to Docker
+- Git installed
+
 ### 1. Clone the repository
 
 ```bash
@@ -86,20 +99,7 @@ git clone https://github.com/anirudhadda/stock-pipeline.git
 cd stock-pipeline
 ```
 
-### 2. Create and activate virtual environment
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Create your `.env` file
+### 2. Create your `.env` file
 
 ```bash
 touch .env
@@ -112,46 +112,30 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_DB=stock_db
 
-### 5. Start PostgreSQL with Docker
+### 3. Start the entire stack
 
 ```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-### 6. Initialize Airflow
+### 4. Access the services
 
-```bash
-export AIRFLOW_HOME=~/Documents/project/airflow
-airflow db migrate
-airflow users create \
-    --username admin \
-    --firstname admin \
-    --lastname admin \
-    --role Admin \
-    --email admin@example.com \
-    --password admin
-```
+| Service             | URL                   |
+| ------------------- | --------------------- |
+| Airflow UI          | http://localhost:8080 |
+| Streamlit Dashboard | http://localhost:8501 |
 
-### 7. Start Airflow webserver and scheduler
+### 5. Trigger the pipeline
 
-```bash
-# Terminal 1
-airflow webserver --port 8080
-
-# Terminal 2
-airflow scheduler
-```
-
-### 8. Trigger the pipeline
-
-- Open `http://localhost:8080`
+- Open http://localhost:8080
+- Login with `admin` / `admin`
 - Enable the `stock_pipeline` DAG
 - Click ▶️ to trigger a run
 
-### 9. Launch the dashboard
+### 6. Stop everything
 
 ```bash
-streamlit run dashboard/app.py
+docker-compose -f docker/docker-compose.yml down
 ```
 
 ---
@@ -170,12 +154,14 @@ streamlit run dashboard/app.py
 
 ## 🐛 Known Issues & Fixes
 
-| Issue                                   | Fix                                    |
-| --------------------------------------- | -------------------------------------- |
-| Airflow scheduler crashing with SQLite  | Switched Airflow backend to PostgreSQL |
-| `DROP TABLE` failing due to dbt views   | Added `CASCADE` to drop command        |
-| yfinance version incompatibility        | Upgraded to `yfinance==1.4.0`          |
-| SQLAlchemy version conflict with pandas | Downgraded to `sqlalchemy==1.4.46`     |
+| Issue                                   | Fix                                                       |
+| --------------------------------------- | --------------------------------------------------------- |
+| Airflow scheduler crashing              | Switched Airflow backend to PostgreSQL + fixed secret key |
+| `DROP TABLE` failing due to dbt views   | Added `CASCADE` to drop command                           |
+| yfinance version incompatibility        | Upgraded to `yfinance==1.4.0`                             |
+| SQLAlchemy version conflict with pandas | Used `psycopg2` directly instead                          |
+| dbt marts hanging                       | Increased Docker memory to 12GB                           |
+| dbt `profiles.yml` not found in Docker  | Added profiles.yml to custom Dockerfile                   |
 
 ---
 
