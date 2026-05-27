@@ -109,7 +109,7 @@ def load_to_postgres(df):
 
     # Drop the table if it exists and recreate it fresh
     # This ensures we always have clean data
-    cursor.execute("DROP TABLE IF EXISTS raw_stock_prices")
+    cursor.execute("DROP TABLE IF EXISTS raw_stock_prices CASCADE")
 
     # Create the table
     create_table(cursor)
