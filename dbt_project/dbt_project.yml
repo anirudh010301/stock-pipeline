@@ -28,4 +28,4 @@ models:
     staging:
       +materialized: view # Staging models are created as views
     marts:
-      +materialized: table # Mart models are created as tables
+      +materialized: view # Mart models are created as view

@@ -1,6 +1,39 @@
-version: '3.8'
+# ============================================================
+# docker-compose.yml
+# This file defines all the services our project needs
+# Run everything with: docker-compose -f docker/docker-compose.yml up -d
+# ============================================================
+
+x-airflow-common: &airflow-common
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.airflow
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://stock_user:stock_password@postgres:5432/airflow_db
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__CORE__FERNET_KEY: "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+    AIRFLOW__WEBSERVER__SECRET_KEY: "stock_pipeline_secret_key_2024"
+    POSTGRES_USER: stock_user
+    POSTGRES_PASSWORD: stock_password
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: 5432
+    POSTGRES_DB: stock_db
+  volumes:
+    - ../dags:/opt/airflow/dags
+    - ../ingestion:/opt/airflow/ingestion
+    - ../dbt_project:/opt/airflow/dbt_project
+    - ../logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
 
 services:
+  # ============================================================
+  # SERVICE 1: PostgreSQL
+  # Runs our main database for both stock data and Airflow
+  # ============================================================
   postgres:
     image: postgres:15
     container_name: stock_postgres
@@ -12,6 +45,71 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # This script creates the airflow_db on first startup
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      # Wait until PostgreSQL is ready before starting Airflow
+      test: ["CMD", "pg_isready", "-U", "stock_user"]
+      interval: 5s
+      retries: 5
 
+  # ============================================================
+  # SERVICE 2: Airflow Webserver
+  # The web UI for monitoring our pipeline
+  # ============================================================
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow_webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  # ============================================================
+  # SERVICE 3: Airflow Scheduler
+  # The brain that triggers our pipeline daily
+  # ============================================================
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow_scheduler
+    command: scheduler
+    restart: always
+
+  # ============================================================
+  # SERVICE 4: Airflow Init
+  # Runs once to set up the Airflow database and admin user
+  # ============================================================
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow_init
+    command: >
+      bash -c "airflow db migrate && airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@example.com --password admin"
+    restart: on-failure
+
+  # ============================================================
+  # SERVICE 5: Streamlit Dashboard
+  # ============================================================
+  streamlit:
+    image: python:3.12-slim
+    container_name: stock_dashboard
+    working_dir: /app
+    volumes:
+      - ../:/app
+    command: >
+      bash -c "
+        pip install -r dashboard/requirements.txt &&
+        streamlit run dashboard/app.py --server.port 8501
+      "
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: stock_user
+      POSTGRES_PASSWORD: stock_password
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: stock_db
 volumes:
   postgres_data:

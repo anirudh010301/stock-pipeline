@@ -1,0 +1,39 @@
+# ============================================================
+# Dockerfile.airflow
+# Custom Airflow image with our required packages installed
+# ============================================================
+
+# Start from the official Airflow image
+FROM apache/airflow:2.10.5
+
+# Switch to airflow user (not root) to install packages
+USER airflow
+
+# Install our required packages including dbt
+RUN pip install --no-cache-dir \
+    yfinance==1.4.0 \
+    psycopg2-binary==2.9.9 \
+    pandas==2.2.0 \
+    python-dotenv==1.0.1 \
+    sqlalchemy==1.4.46 \
+    dbt-postgres \
+    dbt-core
+
+# Create the .dbt directory
+RUN mkdir -p /home/airflow/.dbt
+
+# Write profiles.yml using a heredoc so formatting is correct
+RUN printf '%s\n' \
+    'stock_pipeline:' \
+    '  target: dev' \
+    '  outputs:' \
+    '    dev:' \
+    '      type: postgres' \
+    '      host: postgres' \
+    '      port: 5432' \
+    '      user: stock_user' \
+    '      password: stock_password' \
+    '      dbname: stock_db' \
+    '      schema: public' \
+    '      threads: 4' \
+    > /home/airflow/.dbt/profiles.yml
