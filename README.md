@@ -1,29 +1,30 @@
 # 📈 Stock Price Data Pipeline
 
-An end-to-end batch data pipeline that automatically ingests real stock market data daily, transforms it, stores it in a production-grade database, and displays it on an interactive Bloomberg-style dashboard.
+An end-to-end batch data pipeline that automatically ingests real stock market data daily, transforms it, stores it in a production-grade database, and displays it on an interactive Bloomberg-style dashboard — fully orchestrated by Apache Airflow.
 
 ---
 
 ## 🏗️ Architecture
 
-yfinance API → Python Ingestion → PostgreSQL → dbt Transformation → Streamlit Dashboard
+yfinance API → Python Ingestion → PostgreSQL (Raw) → dbt Transformation → PostgreSQL (Marts) → Streamlit Dashboard
 ↑
-Docker & Airflow
+Apache Airflow (Daily Schedule)
+Docker & Docker Compose
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer            | Tool                      | Purpose                             |
-| ---------------- | ------------------------- | ----------------------------------- |
-| Data Source      | `yfinance`                | Pulls real stock price data (OHLCV) |
-| Ingestion        | `Python`                  | Extracts and loads raw data         |
-| Orchestration    | `Apache Airflow`          | Schedules pipeline to run daily     |
-| Transformation   | `dbt Core`                | Cleans and transforms raw data      |
-| Data Warehouse   | `PostgreSQL`              | Stores all data via Docker          |
-| Dashboard        | `Streamlit`               | Interactive visualization           |
-| Containerization | `Docker & Docker Compose` | Packages everything together        |
-| Version Control  | `Git & GitHub`            | Tracks all code changes             |
+| Layer            | Tool                      | Purpose                                           |
+| ---------------- | ------------------------- | ------------------------------------------------- |
+| Data Source      | `yfinance`                | Pulls real stock price data (OHLCV)               |
+| Ingestion        | `Python`                  | Extracts and loads raw data into PostgreSQL       |
+| Orchestration    | `Apache Airflow`          | Schedules and monitors pipeline daily at midnight |
+| Transformation   | `dbt Core`                | Cleans and transforms raw data using SQL models   |
+| Data Warehouse   | `PostgreSQL`              | Stores all data — also used as Airflow backend    |
+| Dashboard        | `Streamlit`               | Interactive Bloomberg-style visualization         |
+| Containerization | `Docker & Docker Compose` | Runs PostgreSQL in an isolated container          |
+| Version Control  | `Git & GitHub`            | Tracks all code changes publicly                  |
 
 ---
 
@@ -34,7 +35,20 @@ Docker & Airflow
 - 📦 Volume analysis with 7-day average volume
 - 🔢 Key metrics — latest close, 52-week high/low, volatility
 - 🆚 Normalized price comparison across all 5 stocks
-- 📋 Raw data table with all metrics
+- 📋 Raw data table with all calculated metrics
+
+---
+
+## ⚙️ Pipeline DAG
+
+The Airflow DAG runs every day at midnight with 3 tasks in order:
+ingest_stock_data → dbt_staging → dbt_marts
+
+| Task                | Type           | Purpose                                            |
+| ------------------- | -------------- | -------------------------------------------------- |
+| `ingest_stock_data` | PythonOperator | Pulls data from yfinance and loads into PostgreSQL |
+| `dbt_staging`       | BashOperator   | Runs staging model to clean raw data               |
+| `dbt_marts`         | BashOperator   | Runs marts model to calculate moving averages      |
 
 ---
 
@@ -42,18 +56,21 @@ Docker & Airflow
 
 stock-pipeline/
 │
-├── dags/ # Airflow DAG files
+├── airflow/ # Airflow configuration
+│ └── airflow.cfg # Airflow settings (PostgreSQL backend)
+├── dags/
+│ └── stock_pipeline_dag.py # Airflow DAG definition
 ├── ingestion/
 │ └── fetch_stocks.py # Python ingestion script
 ├── dashboard/
 │ └── app.py # Streamlit dashboard
 ├── dbt_project/
 │ ├── models/
-│ │ ├── staging/ # Staging models
-│ │ └── marts/ # Final analytics models
+│ │ ├── staging/ # stg_stock_prices.sql
+│ │ └── marts/ # fct_stock_prices.sql
 │ └── dbt_project.yml # dbt configuration
 ├── docker/
-│ └── docker-compose.yml # Docker configuration
+│ └── docker-compose.yml # PostgreSQL container config
 ├── .env # Environment variables (not on GitHub)
 ├── requirements.txt # Python dependencies
 └── README.md # Project documentation
@@ -65,7 +82,7 @@ stock-pipeline/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/addaanirudh/stock-pipeline.git
+git clone https://github.com/anirudhadda/stock-pipeline.git
 cd stock-pipeline
 ```
 
@@ -101,21 +118,37 @@ POSTGRES_DB=stock_db
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-### 6. Run the ingestion script
+### 6. Initialize Airflow
 
 ```bash
-python ingestion/fetch_stocks.py
+export AIRFLOW_HOME=~/Documents/project/airflow
+airflow db migrate
+airflow users create \
+    --username admin \
+    --firstname admin \
+    --lastname admin \
+    --role Admin \
+    --email admin@example.com \
+    --password admin
 ```
 
-### 7. Run dbt transformations
+### 7. Start Airflow webserver and scheduler
 
 ```bash
-cd dbt_project
-dbt run
-cd ..
+# Terminal 1
+airflow webserver --port 8080
+
+# Terminal 2
+airflow scheduler
 ```
 
-### 8. Launch the dashboard
+### 8. Trigger the pipeline
+
+- Open `http://localhost:8080`
+- Enable the `stock_pipeline` DAG
+- Click ▶️ to trigger a run
+
+### 9. Launch the dashboard
 
 ```bash
 streamlit run dashboard/app.py
@@ -132,6 +165,17 @@ streamlit run dashboard/app.py
 | `MSFT`  | Microsoft Corporation |
 | `AMZN`  | Amazon.com Inc.       |
 | `META`  | Meta Platforms Inc.   |
+
+---
+
+## 🐛 Known Issues & Fixes
+
+| Issue                                   | Fix                                    |
+| --------------------------------------- | -------------------------------------- |
+| Airflow scheduler crashing with SQLite  | Switched Airflow backend to PostgreSQL |
+| `DROP TABLE` failing due to dbt views   | Added `CASCADE` to drop command        |
+| yfinance version incompatibility        | Upgraded to `yfinance==1.4.0`          |
+| SQLAlchemy version conflict with pandas | Downgraded to `sqlalchemy==1.4.46`     |
 
 ---
 
